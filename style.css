@@ -1,0 +1,12 @@
+/* Remove margins */
+body {
+    margin: 0;
+    overflow: hidden;
+    background: #111;
+    font-family: Arial, sans-serif;
+}
+
+/* Fullscreen canvas */
+canvas {
+    display: block;
+}
