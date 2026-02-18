@@ -20,6 +20,8 @@ canvas.addEventListener("mousemove", e => {
 
 canvas.addEventListener("mousedown", () => shoot());
 
+/* ================= PLAYER ================= */
+
 let player = {
     x: MAP_WIDTH / 2,
     y: MAP_HEIGHT / 2,
@@ -28,11 +30,17 @@ let player = {
     weapon: 0
 };
 
+/* ================= WEAPONS ================= */
+
 let weapons = [
     { name: "Pistol", damage: 1, ammo: Infinity, fireRate: 400 },
     { name: "Rifle", damage: 2, ammo: 30, fireRate: 600 },
     { name: "Full-Auto", damage: 1, ammo: 60, fireRate: 100 }
 ];
+
+let lastShot = 0;
+
+/* ================= GAME ARRAYS ================= */
 
 let bullets = [];
 let zombies = [];
@@ -45,26 +53,20 @@ let houses = [];
 
 let score = 0;
 let wave = 1;
-let lastShot = 0;
 
-/* ========================
-   WORLD GENERATION
-======================== */
+/* ================= WORLD GENERATION ================= */
 
 for (let i = 0; i < 40; i++) {
-    houses.push({
+    let h = {
         x: Math.random() * (MAP_WIDTH - 150),
         y: Math.random() * (MAP_HEIGHT - 120),
         w: 120,
-        h: 90,
-        doorX: 0,
-        doorY: 0
-    });
-}
-houses.forEach(h => {
+        h: 90
+    };
     h.doorX = h.x + h.w / 2 - 15;
     h.doorY = h.y + h.h - 12;
-});
+    houses.push(h);
+}
 
 for (let i = 0; i < 5; i++) {
     lakes.push({
@@ -99,19 +101,21 @@ for (let i = 0; i < 30; i++) {
     });
 }
 
-/* ========================
-   ZOMBIE SPAWNING
-======================== */
+/* ================= ZOMBIES ================= */
 
 function spawnWave() {
     for (let i = 0; i < wave * 5; i++) {
+
         let type = Math.random();
+
         let z = {
             x: Math.random() * MAP_WIDTH,
             y: Math.random() * MAP_HEIGHT,
             radius: 14,
             hp: 1,
-            speed: 1
+            speed: 1,
+            faceType: Math.floor(Math.random() * 3),
+            helmet: false
         };
 
         if (type < 0.6) {
@@ -120,6 +124,7 @@ function spawnWave() {
         } else if (type < 0.85) {
             z.hp = 4;
             z.speed = 0.8;
+            z.helmet = true;
         } else {
             z.hp = 1;
             z.speed = 2;
@@ -132,36 +137,33 @@ function spawnWave() {
 
 spawnWave();
 
-/* ========================
-   HELPERS
-======================== */
+/* ================= HELPERS ================= */
 
 function inWater(x, y) {
-    for (let l of lakes) {
+    for (let l of lakes)
         if (Math.hypot(x - l.x, y - l.y) < l.radius) return true;
-    }
-    for (let r of rivers) {
+
+    for (let r of rivers)
         if (x > r.x && x < r.x + r.length &&
             y > r.y && y < r.y + r.width)
             return true;
-    }
+
     return false;
 }
 
 function onDock(x, y) {
-    for (let d of docks) {
+    for (let d of docks)
         if (x > d.x && x < d.x + d.w &&
             y > d.y && y < d.y + d.h)
             return true;
-    }
+
     return false;
 }
 
-/* ========================
-   SHOOTING
-======================== */
+/* ================= SHOOTING ================= */
 
 function shoot() {
+
     let now = Date.now();
     let weapon = weapons[player.weapon];
 
@@ -184,16 +186,13 @@ function shoot() {
     });
 }
 
-/* ========================
-   UPDATE LOOP
-======================== */
+/* ================= UPDATE ================= */
 
 function update() {
 
     let speed = player.speed;
-    if (inWater(player.x, player.y) && !onDock(player.x, player.y)) {
+    if (inWater(player.x, player.y) && !onDock(player.x, player.y))
         speed = 1.5;
-    }
 
     if (keys["w"]) player.y -= speed;
     if (keys["s"]) player.y += speed;
@@ -204,11 +203,6 @@ function update() {
         b.x += b.dx;
         b.y += b.dy;
     });
-
-    bullets = bullets.filter(b =>
-        b.x > 0 && b.x < MAP_WIDTH &&
-        b.y > 0 && b.y < MAP_HEIGHT
-    );
 
     zombies.forEach(z => {
         let angle = Math.atan2(player.y - z.y, player.x - z.x);
@@ -251,6 +245,7 @@ function update() {
             a.dead = true;
         }
     });
+
     ammoDrops = ammoDrops.filter(a => !a.dead);
 
     if (zombies.length === 0) {
@@ -262,58 +257,88 @@ function update() {
     requestAnimationFrame(update);
 }
 
-/* ========================
-   DRAW
-======================== */
+/* ================= DRAW ================= */
 
 function draw() {
 
-    ctx.fillStyle = "#3a7f3a";
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#3f8f3f";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     let offsetX = player.x - canvas.width / 2;
     let offsetY = player.y - canvas.height / 2;
 
     lakes.forEach(l => {
-        ctx.fillStyle = "#1565c0";
+        let lx = l.x - offsetX;
+        let ly = l.y - offsetY;
+        let grad = ctx.createRadialGradient(lx, ly, 20, lx, ly, l.radius);
+        grad.addColorStop(0, "#4fc3f7");
+        grad.addColorStop(1, "#0d47a1");
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(l.x - offsetX, l.y - offsetY, l.radius, 0, Math.PI * 2);
+        ctx.arc(lx, ly, l.radius, 0, Math.PI * 2);
         ctx.fill();
     });
 
-    rivers.forEach(r => {
-        ctx.fillStyle = "#1976d2";
-        ctx.fillRect(r.x - offsetX, r.y - offsetY, r.length, r.width);
-    });
-
-    docks.forEach(d => {
-        ctx.fillStyle = "#8B4513";
-        ctx.fillRect(d.x - offsetX, d.y - offsetY, d.w, d.h);
-    });
-
     houses.forEach(h => {
-        ctx.fillStyle = "#8B4513";
-        ctx.fillRect(h.x - offsetX, h.y - offsetY, h.w, h.h);
-        ctx.fillStyle = "#654321";
+        let hx = h.x - offsetX;
+        let hy = h.y - offsetY;
+
+        let grad = ctx.createLinearGradient(hx, hy, hx, hy + h.h);
+        grad.addColorStop(0, "#a05a2c");
+        grad.addColorStop(1, "#6d3f1f");
+
+        ctx.fillStyle = grad;
+        ctx.fillRect(hx, hy, h.w, h.h);
+
+        ctx.fillStyle = "#3e2723";
         ctx.fillRect(h.doorX - offsetX, h.doorY - offsetY, 30, 15);
     });
 
     crates.forEach(c => {
-        ctx.fillStyle = "#a0522d";
-        ctx.fillRect(c.x - offsetX - 15, c.y - offsetY - 15, 30, 30);
+        let cx = c.x - offsetX;
+        let cy = c.y - offsetY;
+        ctx.fillStyle = "#8b5a2b";
+        ctx.fillRect(cx - 15, cy - 15, 30, 30);
     });
 
     zombies.forEach(z => {
-        ctx.fillStyle = "green";
+
+        let zx = z.x - offsetX;
+        let zy = z.y - offsetY;
+
+        ctx.fillStyle = "rgba(0,0,0,0.3)";
         ctx.beginPath();
-        ctx.arc(z.x - offsetX, z.y - offsetY, z.radius, 0, Math.PI * 2);
+        ctx.ellipse(zx + 3, zy + 6, z.radius, z.radius * 0.4, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        let grad = ctx.createRadialGradient(zx - 4, zy - 4, 2, zx, zy, z.radius);
+        grad.addColorStop(0, "#66bb6a");
+        grad.addColorStop(1, "#1b5e20");
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(zx, zy, z.radius, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (z.helmet) {
+            ctx.fillStyle = "#555";
+            ctx.beginPath();
+            ctx.arc(zx, zy - z.radius / 2, z.radius * 0.9, Math.PI, 0);
+            ctx.fill();
+        }
+
+        ctx.fillStyle = "black";
+        ctx.beginPath();
+        ctx.arc(zx - 4, zy - 3, 2, 0, Math.PI * 2);
+        ctx.arc(zx + 4, zy - 3, 2, 0, Math.PI * 2);
         ctx.fill();
     });
 
     bullets.forEach(b => {
         ctx.fillStyle = "black";
         ctx.beginPath();
-        ctx.arc(b.x - offsetX, b.y - offsetY, 4, 0, Math.PI * 2);
+        ctx.arc(b.x - offsetX, b.y - offsetY, 3, 0, Math.PI * 2);
         ctx.fill();
     });
 
@@ -323,8 +348,9 @@ function draw() {
     ctx.fill();
 
     ctx.fillStyle = "white";
+    ctx.font = "18px Arial";
     ctx.fillText("Score: " + score, 20, 30);
-    ctx.fillText("Wave: " + wave, 20, 50);
+    ctx.fillText("Wave: " + wave, 20, 55);
 }
 
 update();
